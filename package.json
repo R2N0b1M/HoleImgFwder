@@ -1,0 +1,21 @@
+{
+    "name": "hole-img-fwder",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev": "next dev",
+        "build": "next build",
+        "start": "next start",
+        "lint": "next lint"
+    },
+    "dependencies": {
+        "mdb-react-ui-kit": "^2.2.0",
+        "next": "12.0.1",
+        "react-toast-notifications": "^2.5.1",
+        "use-file-picker": "^1.4.1"
+    },
+    "devDependencies": {
+        "eslint": "^7.32.0",
+        "eslint-config-next": "12.0.8"
+    }
+}
