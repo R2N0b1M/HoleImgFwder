@@ -33,7 +33,7 @@ function Form() {
     const formBody = Object.keys(payload).map(key => 
       encodeURIComponent(key) + '=' + encodeURIComponent(payload[key])
     ).join('&');
-    let url = new URL("/api/pkuhole", window.location.href);
+    let url = new URL("https://pkuhelper.pku.edu.cn/services/pkuhole/api.php");
     let params = new URLSearchParams();
     params.append("action", "dopost");
     params.append("PKUHelperAPI", "3.0");
@@ -150,26 +150,9 @@ export default function Home() {
             <hr />
             <MDBTypography note noteColor='info'>
               <p><strong>Q: 这是什么工具？</strong></p>
-              <p>A: 此工具可以转发未压缩的图片到 P大树洞，可以实现发送 GIF 的功能。</p>
+              <p>A: 此工具可以转发未压缩的图片到 P大树洞<MDBTypography tag='del'>，曾可以实现发送 GIF 的功能</MDBTypography>。</p>
               <p><strong>Q: 我的 TOKEN 会被此工具的开发者窃取吗？</strong></p>
-              <p>A: 项目部署在 <a href="https://vercel.com">Vercel</a> 上且代码<a href="/_src">开源</a>，开发者不会也没有能力窃取上传的 TOKEN 。</p>
-              <p><strong>Q: 我上传的所有数据均不会记录吗？</strong></p>
-              <p>A: 所有上传的数据流量均会通过 Vercel ，可以参阅 Vercel 的 <a href="https://vercel.com/legal/privacy-policy">privacy policy</a>。</p>
-              <p><strong>Q: 如果我信任 Vercel ，那我的数据一定安全吗？</strong></p>
-              <p>
-                A: 上传时的 user-agent 可能会被<strong>任何人</strong>查看，您目前的 user-agent 为
-                <MDBTypography tag='mark'>{ userAgent }</MDBTypography>，如果您不希望您的 user-agent 被其他人查看，请勿使用本工具。
-              </p>
-              <p><strong>Q: 如果我不信任 Vercel ，我有其他途径实现类似该工具的效果吗？</strong></p>
-              {
-                isLoading ? (
-                  <p>加载中...</p>
-                ) : (
-                  <p>
-                    A: 如果您使用树洞网页版，您可以将 <a href={ data }>PKUHoleImageSender</a> 拖动至书签栏，切换至树洞网页版标签页后点击该书签。
-                  </p>
-                )
-              }
+              <p>A: 项目部署在 <a href="https://vercel.com">Vercel</a> 上且代码<a href="/_src">开源</a>，开发者不会也没有能力窃取上传的 TOKEN 。此项目为纯前端工具，请求直接发送到 PKUHelper 服务器，不存在泄露风险。</p>
             </MDBTypography>
             <hr />
             <div>

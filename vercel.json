@@ -1,8 +1,0 @@
-{
-    "rewrites": [
-        {
-            "source": "/api/pkuhole",
-            "destination": "https://pkuhelper.pku.edu.cn/services/pkuhole/api.php"
-        }
-    ]
-}
