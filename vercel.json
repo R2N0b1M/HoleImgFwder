@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/unpkg/:path*",
+      "destination": "https://unpkg.com/:path*"
+    },
+    {
+      "source": "/unpkg/:path*/",
+      "destination": "https://unpkg.com/:path*/"
+    }
+  ]
+}

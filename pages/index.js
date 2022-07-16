@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Script from 'next/script';
 import { useEffect, useState } from 'react';
 import { useFilePicker } from 'use-file-picker';
 import { ToastProvider, useToasts } from 'react-toast-notifications';
@@ -16,12 +17,47 @@ import 'mdb-react-ui-kit/dist/css/mdb.min.css';
 
 function Form() {
   const [btnDisabled, setBtnDisabled] = useState(false);
+  const [previewAPNG, setPreviewAPNG] = useState(null);
   const [openFileSelector, { filesContent }] = useFilePicker({
     accept: 'image/*',
     readAs: 'DataURL',
     multiple: false,
   });
   const { addToast } = useToasts();
+
+  const getFFmpeg = async () => {
+    const { createFFmpeg } = FFmpeg;
+    const ffmpeg = createFFmpeg({ log: true });
+    await ffmpeg.load();
+    return ffmpeg;
+  }
+
+  const convertGIFtoAPNG = async (GIF_base64) => {
+    const GIF_raw = Uint8Array.from(atob(GIF_base64), c => c.charCodeAt(0));
+    let ffmpeg;
+    try {
+      ffmpeg = await getFFmpeg();
+    } catch (error) {
+      addToast("无法加载 ffmpeg.js ，请检查网络后重试。", { appearance: 'error' });
+      throw error;
+    }
+    try {
+      ffmpeg.FS('writeFile', 'input.gif', GIF_raw);
+      await ffmpeg.run('-i', 'input.gif', '-f', 'apng', '-plays', '0', 'output.png');
+      const APNG_raw = await ffmpeg.FS('readFile', 'output.png');
+      const APNG_base64 = btoa(APNG_raw.reduce((acc, cur) => acc + String.fromCharCode(cur), ''));
+      return APNG_base64;
+    } catch(e) {
+      addToast("转换失败", { appearance: 'error' });
+      throw e;
+    }
+  };
+
+  const readImageTypeAndBase64 = async (dataurl) => {
+    const imageType = dataurl.split(',')[0].split(';')[0].split(':')[1];
+    const base64 = dataurl.substr(dataurl.indexOf("base64,") + "base64,".length);
+    return { imageType, image: base64 };
+  }
 
   const onSendV2 = async (token, text, image) => {
     const payload = {
@@ -55,6 +91,8 @@ function Form() {
       addToast("无效的 Token", { appearance: "warning" });
     } else if (json.code === 1 && json.msg === "Invalid image format") {
       addToast("无效的图片", { appearance: "warning" });
+    } else if (json.code === 1 && json.msg.indexOf("server") !== -1) {
+      addToast("未知错误，请尝试减少图片大小", { appearance: "warning" });
     } else {
       addToast("未知错误", { appearance: "error" });
     }
@@ -66,13 +104,25 @@ function Form() {
       addToast("请添加图片", { appearance: 'error' });
       return;
     }
-    const dataurl = filesContent[0].content;
-    const image = dataurl.substr(dataurl.indexOf("base64,") + "base64,".length);
     const token = event.target.token.value;
     const text = event.target.text.value;
     setBtnDisabled(true);
     try {
-      await onSendV2(token, text, image);
+      if (previewAPNG) {
+        const { imageType, image } = await readImageTypeAndBase64(previewAPNG);
+        await onSendV2(token, text, image);
+      } else {
+        const { imageType, image } = await readImageTypeAndBase64(filesContent[0].content);
+        if (imageType !== "image/gif") {
+          await onSendV2(token, text, image);
+        } else {
+          addToast("检测到 GIF 图片，转换中...", { appearance: 'info', autoDismissTimeout: 15000 });
+          const APNG_base64 = await convertGIFtoAPNG(image);
+          const APNG_url = `data:image/png;base64,${APNG_base64}`;
+          setPreviewAPNG(APNG_url);
+          addToast("转换完成，再次点击发送按钮后发送", { appearance: 'success' });
+        }
+      }
     } catch(e) {
       console.error(e);
     }
@@ -87,7 +137,7 @@ function Form() {
           <MDBInput className="mt-2" id="text" label="Text" rows="5" textarea style={{
             minHeight: "4rem"
           }} />
-          <div className="mt-3">
+          <MDBRow className="mt-3">
           {
             filesContent.length === 0 ? (
               <MDBTypography note noteColor='warning'>
@@ -95,16 +145,41 @@ function Form() {
               </MDBTypography>
             ) :
               filesContent.map((file, index) => (
-                <div key={index}>
+                <MDBCol key={index}>
+                  <figure style={{
+                    display: 'inline-block',
+                  }}>
+                    <img
+                      src={file.content} alt={file.name}
+                      className='img-thumbnail'
+                      style={{ maxWidth: '24rem' }}
+                    />
+                    <figcaption style={{
+                      textAlign: 'center',
+                    }}>预览</figcaption>
+                  </figure>
+                </MDBCol>
+              ))
+          }
+          {
+            previewAPNG ? (
+              <MDBCol>
+                <figure style={{
+                  display: 'inline-block',
+                }}>
                   <img
-                    src={file.content} alt={file.name}
+                    src={previewAPNG} alt="preview"
                     className='img-thumbnail'
                     style={{ maxWidth: '24rem' }}
                   />
-                </div>
-              ))
+                  <figcaption style={{
+                    textAlign: 'center',
+                  }}>预览（转换后）</figcaption>
+                </figure>
+              </MDBCol>
+            ) : null
           }
-          </div>
+          </MDBRow>
           <MDBRow className="mt-3">
             <MDBCol>
               <MDBBtn disabled={ btnDisabled } color='primary' block outline type="submit">发送</MDBBtn>
@@ -112,6 +187,7 @@ function Form() {
             <MDBCol>
               <MDBBtn color='secondary' block outline role="button" onClick={(event) => {
                 event.preventDefault();
+                setPreviewAPNG(null);
                 openFileSelector();
               }}>选择图片</MDBBtn>
             </MDBCol>
@@ -150,7 +226,7 @@ export default function Home() {
             <hr />
             <MDBTypography note noteColor='info'>
               <p><strong>Q: 这是什么工具？</strong></p>
-              <p>A: 此工具可以转发未压缩的图片到 P大树洞<MDBTypography tag='del'>，曾可以实现发送 GIF 的功能</MDBTypography>。</p>
+              <p>A: 此工具可以转发未压缩的图片到 P大树洞<MDBTypography tag='del'>，曾可以实现发送 GIF 的功能</MDBTypography>，可以实现发送动图的功能。</p>
               <p><strong>Q: 我的 TOKEN 会被此工具的开发者窃取吗？</strong></p>
               <p>A: 项目部署在 <a href="https://vercel.com">Vercel</a> 上且代码<a href="/_src">开源</a>，开发者不会也没有能力窃取上传的 TOKEN 。此项目为纯前端工具，请求直接发送到 PKUHelper 服务器，不存在泄露风险。</p>
             </MDBTypography>
@@ -190,6 +266,7 @@ export default function Home() {
           </div>
         </MDBFooter>
       </MDBContainer>
+      <Script src="/unpkg/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js"></Script>
     </>
   )
 }
