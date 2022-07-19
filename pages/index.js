@@ -244,23 +244,36 @@ export default function Home() {
           <div className='text-center p-3'>
             <p>
               <hr/>
+              Powered by{' '}
               <a
                 href="https://vercel.com"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Powered by{' '}
                 <img src="/vercel.svg" alt="Vercel Logo" className="logo" style={{
                   height: "1rem",
                 }} />
               </a>
-              &ensp;&ensp;|&ensp;&ensp;
+              {' '}
+              <a
+                href="https://github.com/ffmpegwasm/ffmpeg.wasm"
+                target="_blank"
+                rel="noopener noreferrer"
+              >FFmpeg Wasm</a>
+              {' | '}
               <a
                 href="/_src"
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 Open Source
+              </a>{' / '}
+              <a
+                href="https://github.com/R2N0b1M/HoleImgFwder"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Github
               </a>
             </p>
           </div>
