@@ -18,12 +18,20 @@ import 'mdb-react-ui-kit/dist/css/mdb.min.css';
 function Form() {
   const [btnDisabled, setBtnDisabled] = useState(false);
   const [previewAPNG, setPreviewAPNG] = useState(null);
+  const [previewCompressed, setPreviewCompressed] = useState(null);
   const [openFileSelector, { filesContent }] = useFilePicker({
     accept: 'image/*',
     readAs: 'DataURL',
     multiple: false,
   });
-  const { addToast } = useToasts();
+  const { addToast, updateToast, removeToast } = useToasts();
+
+  const base64ToUint8Array = (base64) => {
+    return Uint8Array.from(atob(base64), c=> c.charCodeAt(0));
+  };
+  const uint8ArrayToBase64 = (uint8Array) => {
+    return btoa(uint8Array.reduce((acc, cur) => acc + String.fromCharCode(cur), ''));
+  };
 
   const getFFmpeg = async () => {
     const { createFFmpeg } = FFmpeg;
@@ -33,7 +41,7 @@ function Form() {
   }
 
   const convertGIFtoAPNG = async (GIF_base64) => {
-    const GIF_raw = Uint8Array.from(atob(GIF_base64), c => c.charCodeAt(0));
+    const GIF_raw = base64ToUint8Array(GIF_base64);
     let ffmpeg;
     try {
       ffmpeg = await getFFmpeg();
@@ -41,16 +49,76 @@ function Form() {
       addToast("无法加载 ffmpeg.js ，请检查网络后重试。", { appearance: 'error' });
       throw error;
     }
+    ffmpeg.setLogger(({ message }) => logging("[ffmpeg] " + message));
     try {
       ffmpeg.FS('writeFile', 'input.gif', GIF_raw);
       await ffmpeg.run('-i', 'input.gif', '-f', 'apng', '-plays', '0', 'output.png');
       const APNG_raw = await ffmpeg.FS('readFile', 'output.png');
-      const APNG_base64 = btoa(APNG_raw.reduce((acc, cur) => acc + String.fromCharCode(cur), ''));
+      const APNG_base64 = uint8ArrayToBase64(APNG_raw);
       return APNG_base64;
     } catch(e) {
       addToast("转换失败", { appearance: 'error' });
       throw e;
     }
+  };
+
+  const compressAPNG = async (APNG_base64) => {
+    try {
+      await apngopt.onStdout(msg => logging("[apngopt] " + msg));
+      await apngopt.init();
+    } catch (error) {
+      addToast("无法加载 apngopt.js ，请检查网络后重试。", { appearance: 'error' });
+      throw error;
+    }
+    try {
+      await apngopt.writeFile("input.png", base64ToUint8Array(APNG_base64));
+      await apngopt.run("input.png", "output.png", "-z1");
+      const compressed_raw = await apngopt.readFile("output.png");
+      return uint8ArrayToBase64(compressed_raw);
+    } catch(error) {
+      addToast("压缩失败", { appearance: 'error' });
+      throw error;
+    }
+  };
+
+  const compressImage = async () => {
+    setBtnDisabled(true);
+    try {
+      const { imageType, image } = await readImageTypeAndBase64(previewAPNG);
+      const compressed = await compressAPNG(image);
+      const dataurl = `data:image/png;base64,${compressed}`;
+      setPreviewCompressed(dataurl);
+      addToast("压缩成功", { appearance: 'success' });
+    } catch (error) {
+      console.error(error);
+    }
+    setBtnDisabled(false);
+  };
+
+  let activeToastId = null;
+  let dismissTimer = null;
+  const logging = async (msg) => {
+    const callback = (id) => activeToastId = id;
+    if (activeToastId) {
+      const options = {
+        content: msg,
+        appearance: 'info',
+        onDismiss: () => activeToastId = null,
+        autoDismiss: false,
+      };
+      updateToast(activeToastId, options, callback);
+    } else {
+      const options = {
+        appearance: 'info',
+        onDismiss: () => activeToastId = null,
+        autoDismiss: false,
+      };
+      addToast(msg, options, callback);
+    }
+    if (dismissTimer) clearTimeout(dismissTimer);
+    dismissTimer = setTimeout(() => {
+      removeToast(activeToastId);
+    }, 5000);
   };
 
   const readImageTypeAndBase64 = async (dataurl) => {
@@ -108,8 +176,8 @@ function Form() {
     const text = event.target.text.value;
     setBtnDisabled(true);
     try {
-      if (previewAPNG) {
-        const { imageType, image } = await readImageTypeAndBase64(previewAPNG);
+      if (previewAPNG || previewCompressed) {
+        const { imageType, image } = await readImageTypeAndBase64(previewCompressed || previewAPNG);
         await onSendV2(token, text, image);
       } else {
         const { imageType, image } = await readImageTypeAndBase64(filesContent[0].content);
@@ -129,6 +197,47 @@ function Form() {
     setBtnDisabled(false);
   };
 
+  const getImageSize = (file) => {
+    if (file.content.indexOf(";base64,") !== -1) {
+      const imageSize = file.content.length * 0.75;
+      let imageSizeStr = "";
+      if (imageSize > 1024 * 1024) {
+        imageSizeStr = `${(imageSize / 1024 / 1024).toFixed(2)} MiB`;
+      }
+      else if (imageSize > 1024) {
+        imageSizeStr = `${(imageSize / 1024).toFixed(2)} KiB`;
+      }
+      else if (imageSize < 1024) {
+        imageSizeStr = `${imageSize} B`;
+      }
+      return imageSizeStr;
+    }
+    return null;
+  };
+
+  let images = [];
+  for (let i = 0; i < filesContent.length; i++) {
+    let file = filesContent[i];
+    file.caption = "预览 " + (getImageSize(file) || "");
+    images.push(file);
+  }
+
+  if (previewAPNG) {
+    images.push({
+      content: previewAPNG,
+      name: "APNG",
+      caption: "预览（转换后）" + (getImageSize({ content: previewAPNG }) || ""),
+    });
+  }
+
+  if (previewCompressed) {
+    images.push({
+      content: previewCompressed,
+      name: "APNG",
+      caption: "预览（压缩后）" + (getImageSize({ content: previewCompressed }) || ""),
+    });
+  }
+
   return (
     <MDBRow className="justify-content-center">
       <MDBCol lg="7" md="9" style={{ marginTop: "100px" }}>
@@ -139,12 +248,12 @@ function Form() {
           }} />
           <MDBRow className="mt-3">
           {
-            filesContent.length === 0 ? (
+            images.length === 0 ? (
               <MDBTypography note noteColor='warning'>
                 <strong>请选择图片</strong>
               </MDBTypography>
             ) :
-              filesContent.map((file, index) => (
+              images.map((file, index) => (
                 <MDBCol key={index}>
                   <figure style={{
                     display: 'inline-block',
@@ -156,28 +265,10 @@ function Form() {
                     />
                     <figcaption style={{
                       textAlign: 'center',
-                    }}>预览</figcaption>
+                    }}>{file.caption}</figcaption>
                   </figure>
                 </MDBCol>
               ))
-          }
-          {
-            previewAPNG ? (
-              <MDBCol>
-                <figure style={{
-                  display: 'inline-block',
-                }}>
-                  <img
-                    src={previewAPNG} alt="preview"
-                    className='img-thumbnail'
-                    style={{ maxWidth: '24rem' }}
-                  />
-                  <figcaption style={{
-                    textAlign: 'center',
-                  }}>预览（转换后）</figcaption>
-                </figure>
-              </MDBCol>
-            ) : null
           }
           </MDBRow>
           <MDBRow className="mt-3">
@@ -185,12 +276,23 @@ function Form() {
               <MDBBtn disabled={ btnDisabled } color='primary' block outline type="submit">发送</MDBBtn>
             </MDBCol>
             <MDBCol>
-              <MDBBtn color='secondary' block outline role="button" onClick={(event) => {
+              <MDBBtn disabled={ btnDisabled } color='secondary' block outline role="button" onClick={(event) => {
                 event.preventDefault();
                 setPreviewAPNG(null);
+                setPreviewCompressed(null);
                 openFileSelector();
               }}>选择图片</MDBBtn>
             </MDBCol>
+            {
+              previewAPNG ? (
+                <MDBCol>
+                  <MDBBtn disabled={ btnDisabled } color='dark' block outline role="button" onClick={(event) => {
+                    event.preventDefault();
+                    compressImage();
+                  }}>压缩</MDBBtn>
+                </MDBCol>
+              ) : null
+            }
           </MDBRow>
         </form>
       </MDBCol>
@@ -260,6 +362,12 @@ export default function Home() {
                 target="_blank"
                 rel="noopener noreferrer"
               >FFmpeg Wasm</a>
+              {' '}
+              <a
+                href="https://sourceforge.net/projects/apng/files/APNG_Optimizer/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >APNG Optimizer</a>
               {' | '}
               <a
                 href="/_src"
@@ -280,6 +388,7 @@ export default function Home() {
         </MDBFooter>
       </MDBContainer>
       <Script src="/unpkg/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js"></Script>
+      <Script src="/apngopt-agent.js"></Script>
     </>
   )
 }

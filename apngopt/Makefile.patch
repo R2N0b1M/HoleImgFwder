@@ -1,0 +1,27 @@
+--- Makefile	2022-07-21 13:13:03.460482948 +0800
++++ Makefile_new	2022-07-21 12:42:48.503130454 +0800
+@@ -1,7 +1,7 @@
+ PACKAGE    = apngopt
+-CC         = gcc
++CC         = emcc
+ SRC_DIRS   = . 7z zopfli
+-CFLAGS     = -Wall -pedantic
++CFLAGS     = -Wall -pedantic -s USE_LIBPNG=1 -s ALLOW_MEMORY_GROWTH=1 -s MODULARIZE=1 -s EXPORT_NAME='createAPNGOpt' -s EXPORTED_FUNCTIONS=_callMain -s EXPORTED_RUNTIME_METHODS=FS,ccall,cwrap,writeAsciiToMemory,setValue -s ENVIRONMENT=worker
+ CFLAGS_OPT = -O2
+ CFLAGS_7Z  = -Wno-sign-compare -Wno-reorder -Wno-maybe-uninitialized -Wno-parentheses
+ LIBS       = -lstdc++ -lm -lpng -lz
+@@ -16,7 +16,7 @@
+ all : $(PACKAGE)
+ 
+ $(PACKAGE) : objdirs $(OBJECTS)
+-	$(CC) -o $@ $(OBJECTS) -s $(LIBS)
++	$(CC) -o $@.js $(OBJECTS) -s $(LIBS) $(CFLAGS)
+ 
+ objdirs :
+ 	mkdir -p $(OBJ_DIRS)
+@@ -33,4 +33,4 @@
+ .PHONY : clean
+ 
+ clean : 
+-	rm -rf $(PACKAGE) obj
++	rm -rf $(PACKAGE) $(PACKAGE).js $(PACKAGE).wasm obj

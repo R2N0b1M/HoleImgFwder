@@ -1,0 +1,21 @@
+--- apngopt.cpp	2022-07-21 13:13:00.452321597 +0800
++++ apngopt_new.cpp	2022-07-21 13:13:25.209649531 +0800
+@@ -1422,7 +1422,7 @@
+ }
+ /* APNG encoder - end */
+ 
+-int main(int argc, char** argv)
++int callmain(int argc, char** argv)
+ {
+   char   szInput[256];
+   char   szOut[256];
+@@ -1515,3 +1515,9 @@
+ 
+   return 0;
+ }
++
++extern "C" {
++  int callMain(int argc, char** argv) {
++    return callmain(argc, argv);
++  }
++}
