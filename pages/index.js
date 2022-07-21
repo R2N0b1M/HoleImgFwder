@@ -11,14 +11,18 @@ import {
   MDBCol,
   MDBFooter,
   MDBTypography,
+  MDBRange,
 } from 'mdb-react-ui-kit';
 
 import 'mdb-react-ui-kit/dist/css/mdb.min.css';
 
 function Form() {
   const [btnDisabled, setBtnDisabled] = useState(false);
-  const [previewAPNG, setPreviewAPNG] = useState(null);
-  const [previewCompressed, setPreviewCompressed] = useState(null);
+  const [imageUrls, setImageUrls] = useState({});
+  const [pngIteration, setPNGIteration] = useState(15);
+  const [pngCompressLevel, setPNGCompressLevel] = useState(1);
+  const [gifLossy, setGIFLossy] = useState(20);
+  const [gifMaxColor, setGIFMaxColor] = useState(64);
   const [openFileSelector, { filesContent }] = useFilePicker({
     accept: 'image/*',
     readAs: 'DataURL',
@@ -29,8 +33,38 @@ function Form() {
   const base64ToUint8Array = (base64) => {
     return Uint8Array.from(atob(base64), c=> c.charCodeAt(0));
   };
+
   const uint8ArrayToBase64 = (uint8Array) => {
     return btoa(uint8Array.reduce((acc, cur) => acc + String.fromCharCode(cur), ''));
+  };
+
+  const fileToDataURL = file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
+
+  const readURL = (type) => {
+    if (type == "GIF_origin") {
+      if (filesContent.length > 0) return filesContent[0].content;
+      return undefined;
+    }
+    if (type == "GIF_compressed") return imageUrls.GIF_compressed;
+    if (type == "PNG_origin") return imageUrls.PNG_origin;
+    if (type == "PNG_compressed") return imageUrls.PNG_compressed;
+    throw new Error("Unknown type");
+  };
+
+  const resetURL = () => {
+    setImageUrls({});
+  };
+
+  const setURL = (type, url) => {
+    if (type == "GIF_compressed") setImageUrls({ ...imageUrls, GIF_compressed: url });
+    else if (type == "PNG_origin") setImageUrls({ ...imageUrls, PNG_origin: url });
+    else if (type == "PNG_compressed") setImageUrls({ ...imageUrls, PNG_compressed: url });
+    else throw new Error("Unknown type");
   };
 
   const getFFmpeg = async () => {
@@ -72,7 +106,7 @@ function Form() {
     }
     try {
       await apngopt.writeFile("input.png", base64ToUint8Array(APNG_base64));
-      await apngopt.run("input.png", "output.png", "-z1");
+      await apngopt.run("input.png", "output.png", "-z" + pngCompressLevel, "-i" + pngIteration);
       const compressed_raw = await apngopt.readFile("output.png");
       return uint8ArrayToBase64(compressed_raw);
     } catch(error) {
@@ -81,13 +115,33 @@ function Form() {
     }
   };
 
-  const compressImage = async () => {
+  const compressGIF = async (GIF_base64) => {
+    try {
+      const gifsicle = (await import('gifsicle-wasm-browser')).default
+      const gifs = await gifsicle.run({
+        input: [{
+          file: "data:image/gif;base64," + GIF_base64,
+          name: "input.gif",
+        }],
+        command: [`--colors ${gifMaxColor} --lossy=${gifLossy} input.gif -o /out/output.gif`],
+      });
+      const gif = await fileToDataURL(gifs[0]);
+      const { imageType, image } = readImageTypeAndBase64(gif);
+      return image;
+    } catch (error) {
+      addToast("压缩失败", { appearance: 'error' });
+      throw error;
+    }
+  };
+
+  const compressImage = async (type) => {
     setBtnDisabled(true);
     try {
-      const { imageType, image } = await readImageTypeAndBase64(previewAPNG);
-      const compressed = await compressAPNG(image);
-      const dataurl = `data:image/png;base64,${compressed}`;
-      setPreviewCompressed(dataurl);
+      const dataurl = readURL(type === "GIF" ? "GIF_origin" : "PNG_origin");
+      const { imageType, image } = readImageTypeAndBase64(dataurl);
+      const compressed = await (type === "GIF" ? compressGIF : compressAPNG)(image);
+      const compressedDataURL = "data:" + imageType + ";base64," + compressed;
+      setURL(type === "GIF" ? "GIF_compressed" : "PNG_compressed", compressedDataURL);
       addToast("压缩成功", { appearance: 'success' });
     } catch (error) {
       console.error(error);
@@ -121,7 +175,7 @@ function Form() {
     }, 5000);
   };
 
-  const readImageTypeAndBase64 = async (dataurl) => {
+  const readImageTypeAndBase64 = (dataurl) => {
     const imageType = dataurl.split(',')[0].split(';')[0].split(':')[1];
     const base64 = dataurl.substr(dataurl.indexOf("base64,") + "base64,".length);
     return { imageType, image: base64 };
@@ -176,18 +230,20 @@ function Form() {
     const text = event.target.text.value;
     setBtnDisabled(true);
     try {
-      if (previewAPNG || previewCompressed) {
-        const { imageType, image } = await readImageTypeAndBase64(previewCompressed || previewAPNG);
+      const pngURL = readURL("PNG_compressed") || readURL("PNG_origin");
+      const gifURL = readURL("GIF_compressed") || readURL("GIF_origin");
+      if (pngURL) {
+        const { imageType, image } = readImageTypeAndBase64(pngURL);
         await onSendV2(token, text, image);
       } else {
-        const { imageType, image } = await readImageTypeAndBase64(filesContent[0].content);
+        const { imageType, image } = readImageTypeAndBase64(gifURL);
         if (imageType !== "image/gif") {
           await onSendV2(token, text, image);
         } else {
           addToast("检测到 GIF 图片，转换中...", { appearance: 'info', autoDismissTimeout: 15000 });
           const APNG_base64 = await convertGIFtoAPNG(image);
           const APNG_url = `data:image/png;base64,${APNG_base64}`;
-          setPreviewAPNG(APNG_url);
+          setURL("PNG_origin", APNG_url);
           addToast("转换完成，再次点击发送按钮后发送", { appearance: 'success' });
         }
       }
@@ -216,26 +272,20 @@ function Form() {
   };
 
   let images = [];
-  for (let i = 0; i < filesContent.length; i++) {
-    let file = filesContent[i];
-    file.caption = "预览 " + (getImageSize(file) || "");
-    images.push(file);
-  }
 
-  if (previewAPNG) {
-    images.push({
-      content: previewAPNG,
-      name: "APNG",
-      caption: "预览（转换后）" + (getImageSize({ content: previewAPNG }) || ""),
-    });
-  }
+  const types = ["GIF_origin", "GIF_compressed", "PNG_origin", "PNG_compressed"];
+  const typeNames = ["预览", "预览 (GIF 压缩后) ", "预览 (PNG)", "预览 (PNG 压缩后)"];
+  const isGIF = readURL("GIF_origin") && (readImageTypeAndBase64(readURL("GIF_origin"))).imageType === "image/gif";
 
-  if (previewCompressed) {
-    images.push({
-      content: previewCompressed,
-      name: "APNG",
-      caption: "预览（压缩后）" + (getImageSize({ content: previewCompressed }) || ""),
-    });
+  for (let i = 0; i < types.length; i++) {
+    const dataurl = readURL(types[i]);
+    if (dataurl) {
+      images.push({
+        content: dataurl,
+        caption: typeNames[i] + " " + (getImageSize({ content: dataurl }) || ""),
+        name: types[i],
+      })
+    }
   }
 
   return (
@@ -278,21 +328,58 @@ function Form() {
             <MDBCol>
               <MDBBtn disabled={ btnDisabled } color='secondary' block outline role="button" onClick={(event) => {
                 event.preventDefault();
-                setPreviewAPNG(null);
-                setPreviewCompressed(null);
+                resetURL();
                 openFileSelector();
               }}>选择图片</MDBBtn>
             </MDBCol>
             {
-              previewAPNG ? (
+              isGIF ? (
                 <MDBCol>
                   <MDBBtn disabled={ btnDisabled } color='dark' block outline role="button" onClick={(event) => {
                     event.preventDefault();
-                    compressImage();
-                  }}>压缩</MDBBtn>
+                    compressImage(readURL("PNG_origin") ? "PNG" : "GIF");
+                  }}>压缩 { readURL("PNG_origin") ? "PNG" : "GIF" }</MDBBtn>
                 </MDBCol>
               ) : null
             }
+          </MDBRow>
+          <MDBRow className="mt-3">
+            <MDBCol size="6">
+              <MDBRange
+                defaultValue={gifMaxColor}
+                min={2}
+                max={256}
+                label={'GIF Max Color - ' + gifMaxColor}
+                onChange={(event) => { setGIFMaxColor(event.target.value) }}
+              />
+            </MDBCol>
+            <MDBCol size="6">
+              <MDBRange
+                defaultValue={gifLossy}
+                min={0}
+                max={200}
+                label={'GIF Lossy - ' + gifLossy}
+                onChange={(event) => { setGIFLossy(event.target.value) }}
+              />
+            </MDBCol>
+            <MDBCol size="6">
+              <MDBRange
+                defaultValue={pngCompressLevel}
+                min={0}
+                max={2}
+                label={'PNG Compress Level - ' + pngCompressLevel}
+                onChange={(event) => { setPNGCompressLevel(event.target.value) }}
+              />
+            </MDBCol>
+            <MDBCol size="6">
+              <MDBRange
+                defaultValue={pngIteration}
+                min={1}
+                max={30}
+                label={'PNG Iteration - ' + pngIteration}
+                onChange={(event) => { setPNGIteration(event.target.value) }}
+              />
+            </MDBCol>
           </MDBRow>
         </form>
       </MDBCol>
@@ -356,19 +443,25 @@ export default function Home() {
                   height: "1rem",
                 }} />
               </a>
-              {' '}
+              {' / '}
               <a
                 href="https://github.com/ffmpegwasm/ffmpeg.wasm"
                 target="_blank"
                 rel="noopener noreferrer"
               >FFmpeg Wasm</a>
-              {' '}
+              {' / '}
               <a
                 href="https://sourceforge.net/projects/apng/files/APNG_Optimizer/"
                 target="_blank"
                 rel="noopener noreferrer"
               >APNG Optimizer</a>
-              {' | '}
+              {' / '}
+              <a
+                href="https://github.com/renzhezhilu/gifsicle-wasm-browser"
+                target="_blank"
+                rel="noopener noreferrer"
+              >Gifsicle Wasm</a>
+              <br/>
               <a
                 href="/_src"
                 target="_blank"

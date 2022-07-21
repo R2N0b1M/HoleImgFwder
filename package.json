@@ -9,6 +9,7 @@
         "lint": "next lint"
     },
     "dependencies": {
+        "gifsicle-wasm-browser": "^1.5.16",
         "mdb-react-ui-kit": "^2.2.0",
         "next": "12.0.1",
         "react-toast-notifications": "^2.5.1",
