@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Script from 'next/script';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useFilePicker } from 'use-file-picker';
 import { ToastProvider, useToasts } from 'react-toast-notifications';
 import {
@@ -154,6 +154,7 @@ function Form() {
 
   const compressImage = async (type) => {
     setBtnDisabled(true);
+    await new Promise((res) => setTimeout(res, 1000 / 60)); // 😅
     try {
       const dataurl = readURL(type === "GIF" ? "GIF_origin" : "PNG_origin");
       const { imageType, image } = readImageTypeAndBase64(dataurl);
@@ -255,6 +256,7 @@ function Form() {
     const token = event.target.token.value;
     const text = event.target.text.value;
     setBtnDisabled(true);
+    await new Promise((res) => setTimeout(res, 1000 / 60)); // 😅
     try {
       const pngURL = readURL("PNG_compressed") || readURL("PNG_origin");
       const gifURL = readURL("GIF_compressed") || readURL("GIF_origin");
@@ -297,22 +299,26 @@ function Form() {
     return null;
   };
 
-  let images = [];
+  const { images, isGIF, pngExists } = useMemo(() => {
+    let images = [];
 
-  const types = ["GIF_origin", "GIF_compressed", "PNG_origin", "PNG_compressed"];
-  const typeNames = ["预览", "预览 (GIF 压缩后) ", "预览 (PNG)", "预览 (PNG 压缩后)"];
-  const isGIF = readURL("GIF_origin") && (readImageTypeAndBase64(readURL("GIF_origin"))).imageType === "image/gif";
+    const types = ["GIF_origin", "GIF_compressed", "PNG_origin", "PNG_compressed"];
+    const typeNames = ["预览", "预览 (GIF 压缩后) ", "预览 (PNG)", "预览 (PNG 压缩后)"];
+    const isGIF = readURL("GIF_origin") && (readImageTypeAndBase64(readURL("GIF_origin"))).imageType === "image/gif";
 
-  for (let i = 0; i < types.length; i++) {
-    const dataurl = readURL(types[i]);
-    if (dataurl) {
-      images.push({
-        content: dataurl,
-        caption: typeNames[i] + " " + (getImageSize({ content: dataurl }) || ""),
-        name: types[i],
-      })
+    for (let i = 0; i < types.length; i++) {
+      const dataurl = readURL(types[i]);
+      if (dataurl) {
+        images.push({
+          content: dataurl,
+          caption: typeNames[i] + " " + (getImageSize({ content: dataurl }) || ""),
+          name: types[i],
+        })
+      }
     }
-  }
+
+    return { images, isGIF, pngExists: Boolean(readURL("PNG_origin")) };
+  }, [imageUrls, filesContent]);
 
   return (
     <MDBRow className="justify-content-center">
@@ -363,8 +369,8 @@ function Form() {
                 <MDBCol>
                   <MDBBtn disabled={ btnDisabled } color='dark' block outline role="button" onClick={(event) => {
                     event.preventDefault();
-                    compressImage(readURL("PNG_origin") ? "PNG" : "GIF");
-                  }}>压缩 { readURL("PNG_origin") ? "PNG" : "GIF" }</MDBBtn>
+                    compressImage(pngExists ? "PNG" : "GIF");
+                  }}>压缩 { pngExists ? "PNG" : "GIF" }</MDBBtn>
                 </MDBCol>
               ) : null
             }
