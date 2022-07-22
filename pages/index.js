@@ -70,8 +70,8 @@ function Form() {
   const getFFmpeg = async () => {
     const { createFFmpeg } = FFmpeg;
     const ffmpeg = createFFmpeg({ log: true });
-    ffmpeg.setLogger(({ message }) => logging("[ffmpeg] " + message));
     await ffmpeg.load();
+    ffmpeg.setLogger(({ message }) => logging("[ffmpeg] " + message));
     return ffmpeg;
   }
 
