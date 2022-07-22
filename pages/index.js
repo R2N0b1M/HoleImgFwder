@@ -176,8 +176,15 @@ function Form() {
   };
 
   const readImageTypeAndBase64 = (dataurl) => {
-    const imageType = dataurl.split(',')[0].split(';')[0].split(':')[1];
+    let imageType = dataurl.split(',')[0].split(';')[0].split(':')[1];
     const base64 = dataurl.substr(dataurl.indexOf("base64,") + "base64,".length);
+    const raw = base64ToUint8Array(base64);
+    const gifSignature = new Uint8Array([71, 73, 70]); // GIF
+    const pngSignature = new Uint8Array([137, 80, 78, 71]); // \x89PNG
+    const jpgSignature = new Uint8Array([255, 216, 255]); // \xFF\xD8\xFF
+    if (raw.slice(0, gifSignature.length).toString() === gifSignature.toString()) imageType = "image/gif";
+    if (raw.slice(0, pngSignature.length).toString() === pngSignature.toString()) imageType = "image/png";
+    if (raw.slice(0, jpgSignature.length).toString() === jpgSignature.toString()) imageType = "image/jpeg";
     return { imageType, image: base64 };
   }
 
