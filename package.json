@@ -12,6 +12,7 @@
         "gifsicle-wasm-browser": "^1.5.16",
         "mdb-react-ui-kit": "^2.2.0",
         "next": "12.0.1",
+        "react-github-corner": "^2.5.0",
         "react-toast-notifications": "^2.5.1",
         "use-file-picker": "^1.4.1"
     },

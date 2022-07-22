@@ -3,6 +3,7 @@ import Script from 'next/script';
 import { useEffect, useState, useMemo } from 'react';
 import { useFilePicker } from 'use-file-picker';
 import { ToastProvider, useToasts } from 'react-toast-notifications';
+import GithubCorner from 'react-github-corner';
 import {
   MDBInput,
   MDBBtn,
@@ -439,6 +440,7 @@ export default function Home() {
         <title>PKUHole GIF Sender</title>
       </Head>
       <MDBContainer>
+        <GithubCorner href="https://github.com/R2N0b1M/HoleImgFwder" target="_blank" rel="noopener noreferrer" />
         <ToastProvider autoDismiss>
           <Form/>
         </ToastProvider>
