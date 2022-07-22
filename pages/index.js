@@ -70,6 +70,15 @@ function Form() {
   const getFFmpeg = async () => {
     const { createFFmpeg } = FFmpeg;
     const ffmpeg = createFFmpeg({ log: true });
+    ffmpeg.setLogger(({ message }) => logging("[ffmpeg] " + message));
+    await ffmpeg.load();
+    return ffmpeg;
+  }
+
+  const getFFmpegST = async () => {
+    const ffmpeg = (await import("../public/ffmpeg-agent.js")).ffmpeg;
+    ffmpeg.onStdout(msg => logging("[ffmpeg] " + msg));
+    ffmpeg.onStderr(msg => logging("[ffmpeg] " + msg));
     await ffmpeg.load();
     return ffmpeg;
   }
@@ -80,12 +89,16 @@ function Form() {
     try {
       ffmpeg = await getFFmpeg();
     } catch (error) {
-      addToast("无法加载 ffmpeg.js ，请检查网络后重试。", { appearance: 'error' });
-      throw error;
+      addToast("无法加载 ffmpeg.js ，正在尝试单线程版本", { appearance: 'warning' });
+      try {
+        ffmpeg = await getFFmpegST();
+      } catch (error) {
+        addToast("无法加载 ffmpeg.js", { appearance: 'error' });
+        throw error;
+      }
     }
-    ffmpeg.setLogger(({ message }) => logging("[ffmpeg] " + message));
     try {
-      ffmpeg.FS('writeFile', 'input.gif', GIF_raw);
+      await ffmpeg.FS('writeFile', 'input.gif', GIF_raw);
       await ffmpeg.run('-i', 'input.gif', '-f', 'apng', '-plays', '0', 'output.png');
       const APNG_raw = await ffmpeg.FS('readFile', 'output.png');
       const APNG_base64 = uint8ArrayToBase64(APNG_raw);
@@ -172,6 +185,7 @@ function Form() {
     if (dismissTimer) clearTimeout(dismissTimer);
     dismissTimer = setTimeout(() => {
       removeToast(activeToastId);
+      activeToastId = null;
     }, 5000);
   };
 

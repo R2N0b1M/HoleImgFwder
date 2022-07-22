@@ -1,5 +1,5 @@
 const apngopt = (() => {
-  const worker = new Worker('./worker.js');
+  const worker = new Worker('./worker-apngopt.js');
   let resolve, reject, running = false;
   let stdout_cb = null, stderr_cb = null;
   worker.onmessage = (e) => {
