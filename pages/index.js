@@ -489,6 +489,7 @@ export default function Home() {
       </MDBContainer>
       <Script src="/unpkg/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js"></Script>
       <Script src="/apngopt-agent.js"></Script>
+      <Script data-host="https://microanalytics.io" data-dnt="false" src="/microanalytics/js/script.js" id="ZwSg9rf6GA" async defer></Script>
     </>
   )
 }

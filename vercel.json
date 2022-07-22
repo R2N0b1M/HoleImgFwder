@@ -7,6 +7,14 @@
     {
       "source": "/unpkg/:path*/",
       "destination": "https://unpkg.com/:path*/"
+    },
+    {
+      "source": "/microanalytics/:path*",
+      "destination": "https://microanalytics.io/:path*"
+    },
+    {
+      "source": "/microanalytics/:path*/",
+      "destination": "https://microanalytics.io/:path*/"
     }
   ]
 }
