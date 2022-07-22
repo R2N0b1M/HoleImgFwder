@@ -67,5 +67,12 @@ onmessage = async (e) => {
     } catch (e) {
       postMessage({code: -1, type: "readFile", error: e.message});
     }
+  } else if (e.data.type === "exit") {
+    try {
+      await ffmpeg.exit();
+      postMessage({code: 0, type: "exit", data});
+    } catch (e) {
+      postMessage({code: -1, type: "exit", error: e.message});
+    }
   }
 }

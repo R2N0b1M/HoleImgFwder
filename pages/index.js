@@ -102,6 +102,11 @@ function Form() {
       await ffmpeg.run('-i', 'input.gif', '-f', 'apng', '-plays', '0', 'output.png');
       const APNG_raw = await ffmpeg.FS('readFile', 'output.png');
       const APNG_base64 = uint8ArrayToBase64(APNG_raw);
+      try {
+        await ffmpeg.exit(); // always throwing exceptions emmm...
+      } catch (error) {
+        
+      }
       return APNG_base64;
     } catch(e) {
       addToast("转换失败", { appearance: 'error' });

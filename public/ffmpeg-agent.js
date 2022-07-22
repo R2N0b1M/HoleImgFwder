@@ -1,25 +1,26 @@
 const ffmpeg = (() => {
-  const worker = new Worker('./worker-ffmpeg-st.js');
+  let worker;
   let resolve, reject, running = false;
   let stdout_cb = null, stderr_cb = null;
-  worker.onmessage = (e) => {
-    const data = e.data;
-    if (data.type == "stdout") {
-      stdout_cb && stdout_cb(data.data);
-      return;
-    }
-    if (data.type == "stderr") {
-      stderr_cb && stderr_cb(data.data);
-      return;
-    }
-    if (data.code === 0) resolve(data.data);
-    else reject(data.error);
-  }
   return {
     load: async () => {
       if (running) throw new Error("Atmost one command can be executed at a time.");
       running = true;
       try {
+        worker = new Worker('./worker-ffmpeg-st.js');
+        worker.onmessage = (e) => {
+          const data = e.data;
+          if (data.type == "stdout") {
+            stdout_cb && stdout_cb(data.data);
+            return;
+          }
+          if (data.type == "stderr") {
+            stderr_cb && stderr_cb(data.data);
+            return;
+          }
+          if (data.code === 0) resolve(data.data);
+          else reject(data.error);
+        }
         const resp = await new Promise((res, rej) => {
           resolve = res;
           reject = rej;
@@ -79,6 +80,25 @@ const ffmpeg = (() => {
           });
           return resp;
         }
+      } catch (e) {
+        throw e;
+      } finally {
+        running = false;
+      }
+    },
+    exit: async () => {
+      if (running) throw new Error("Atmost one command can be executed at a time.");
+      running = true;
+      try {
+        const resp = await new Promise((res, rej) => {
+          try {
+            worker.terminate();
+            res();
+          } catch (e) {
+            console.error(e);
+            rej(e);
+          }
+        });
       } catch (e) {
         throw e;
       } finally {
