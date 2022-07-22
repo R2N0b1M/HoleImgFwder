@@ -178,7 +178,7 @@ function Form() {
   const readImageTypeAndBase64 = (dataurl) => {
     let imageType = dataurl.split(',')[0].split(';')[0].split(':')[1];
     const base64 = dataurl.substr(dataurl.indexOf("base64,") + "base64,".length);
-    const raw = base64ToUint8Array(base64);
+    const raw = base64ToUint8Array(base64.slice(0, 20));
     const gifSignature = new Uint8Array([71, 73, 70]); // GIF
     const pngSignature = new Uint8Array([137, 80, 78, 71]); // \x89PNG
     const jpgSignature = new Uint8Array([255, 216, 255]); // \xFF\xD8\xFF
