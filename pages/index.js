@@ -31,6 +31,13 @@ function Form() {
   });
   const { addToast, updateToast, removeToast } = useToasts();
 
+  const fmtSize = (size) => {
+    if (size < 1024) return `${size} B`;
+    if (size < 1024 * 1024) return `${(size / 1024).toFixed(2)} KiB`;
+    if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(2)} MiB`;
+    return `${(size / 1024 / 1024 / 1024).toFixed(2)} GiB`;
+  }
+
   const base64ToUint8Array = (base64) => {
     return Uint8Array.from(atob(base64), c=> c.charCodeAt(0));
   };
@@ -69,18 +76,21 @@ function Form() {
   };
 
   const getFFmpeg = async () => {
+    const sab = new SharedArrayBuffer(1024); // make sure SharedArrayBuffer is supported
+    if (sab === undefined) throw new Error();
     const { createFFmpeg } = FFmpeg;
-    const ffmpeg = createFFmpeg({ log: true });
+    const ffmpeg = createFFmpeg({ log: true, corePath: "/ffmpeg/ffmpeg-core.js" });
     await ffmpeg.load();
     ffmpeg.setLogger(({ message }) => logging("[ffmpeg] " + message));
     return ffmpeg;
   }
 
   const getFFmpegST = async () => {
-    const ffmpeg = (await import("../public/ffmpeg-agent.js")).ffmpeg;
+    const ffmpeg = (await import("../public/ffmpeg-st/ffmpeg-agent.js")).ffmpeg;
+    const corePath = "/ffmpeg-st/ffmpeg-core.js";
     ffmpeg.onStdout(msg => logging("[ffmpeg] " + msg));
     ffmpeg.onStderr(msg => logging("[ffmpeg] " + msg));
-    await ffmpeg.load();
+    await ffmpeg.load({ corePath });
     return ffmpeg;
   }
 
@@ -285,17 +295,7 @@ function Form() {
   const getImageSize = (file) => {
     if (file.content.indexOf(";base64,") !== -1) {
       const imageSize = file.content.length * 0.75;
-      let imageSizeStr = "";
-      if (imageSize > 1024 * 1024) {
-        imageSizeStr = `${(imageSize / 1024 / 1024).toFixed(2)} MiB`;
-      }
-      else if (imageSize > 1024) {
-        imageSizeStr = `${(imageSize / 1024).toFixed(2)} KiB`;
-      }
-      else if (imageSize < 1024) {
-        imageSizeStr = `${imageSize} B`;
-      }
-      return imageSizeStr;
+      return fmtSize(imageSize);
     }
     return null;
   };
@@ -514,8 +514,8 @@ export default function Home() {
           </div>
         </MDBFooter>
       </MDBContainer>
-      <Script src="/unpkg/@ffmpeg/ffmpeg@0.10.0/dist/ffmpeg.min.js"></Script>
-      <Script src="/apngopt-agent.js"></Script>
+      <Script src="/ffmpeg/ffmpeg.min.js"></Script>
+      <Script src="/apngopt/apngopt-agent.js"></Script>
       <Script data-host="https://microanalytics.io" data-dnt="false" src="/microanalytics/js/script.js" id="ZwSg9rf6GA" async defer></Script>
     </>
   )
